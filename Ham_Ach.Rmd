@@ -11,8 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 #Save plots
 ```{r}
 #setwd("~/Users/MarieChevalier/Documents/Oxford/Coding/")
-ggsave("gse_ALL.png", device = "png", 
-    width =15, height = 10, bg = "white")
+ggsave("res0.4UMAP_samples.png", device = "png", 
+    width =35, height = 12, bg = "white")
 
 #12/8
 #ummap settings: width = 24, height = 12
@@ -23,22 +23,39 @@ ggsave("gse_ALL.png", device = "png",
 
 ## Load libraries 
 ```{r}
-#set.seed(1601)
+#set.seed(1)
   if (!requireNamespace('BiocManager', quietly = TRUE))
     install.packages('BiocManager')
-  if (!requireNamespace('SeuratObject', quietly = TRUE))
-    install.packages('SeuratObject')
+#  if (!requireNamespace('SeuratObject', quietly = TRUE))
+#    install.packages('SeuratObject')
+#remotes::install_version("Matrix", "1.6.1")
 library(SeuratObject)
+#remove.packages("SeuratObject")
+#install.packages("SeuratObject", type = "source")
+#install.packages('PCRE2')
 library(Seurat)
 library(tidyverse)
 library(ggplot2)
 library(gridExtra)
 library(harmony)
 library(clustree)
-#devtools::install_version("Matrix", version = "1.6.1.1")
+#install.packages("remotes")
+library(remotes)
+#remove.packages("Matrix")
+#install.packages("Matrix", version= "1.5-4.1")
+#install.packages("Matrix", version = "1.6.1")
+library(Matrix)
+#remotes::install_version("Matrix", version = "1.5-4.1")
+#install.packages("SeuratObject", type = "source")
+#devtools::install_version("Matrix", version = "1.6-1.1")
 #library(Matrix)
 #library(MatrixModels)
+#install.packages("https://cran.r-rproject.com/bin/macosx/big-sur-x86_64/contrib/4.3/Matrix_1.6-1.1.tgz", 
+#  repos = NULL, type = "source")
+
+#https://cran.rstudio.com//src/contrib/Archive/Matrix/Matrix_1.6-1.1.tar.gz
 ```
+
 
 #Import matrisome table and divide structures
 ```{r}
@@ -128,7 +145,7 @@ all.merged <- Reduce(data.merge, data.list)
 all.merged <- subset(all.merged, subset = scDblFinder.class == "singlet" & decontX_contamination < 0.3)  #--> meaning: filter out samples with contamination >30% (started with 50%)
 all.mergedLOG <- all.merged %>% 
                 NormalizeData() %>%
-                FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% #try 5000 for nfeat!!
+                FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% #was 2000 before
                 ScaleData(verbose=FALSE) %>%
                 RunPCA(npcs = 50, verbose=FALSE)
 ElbowPlot(all.mergedLOG)
@@ -149,8 +166,6 @@ all.integrated <- all.integrated %>%
 FindNeighbors(reduction = "harmony", dims = 1:30) %>%
 FindClusters(reduction = "harmony", resolution = 0.1) %>%
 RunUMAP(reduction = "harmony", dims=1:30)
-
-all.integrated <- Seurat::FindNeighbors(all.integrated, reduction = "harmony", dims = 1:30)
 
 #Visualise
 after <- DimPlot(all.integrated, reduction = 'umap', group.by = 'anatomical_site', label = F, pt.size = 1)
@@ -266,21 +281,18 @@ geneName <- c("SCX", "MKX", "TNMD", "FBLN1", "FMOD", #cluster 0 (fib TENO/FMOD+)
               "PECAM1", "PTPRB", "VWF", "ADGRL4", "CD34", "CDH5", "FLT1", "NOTCH4", "TEK", #cluster 2 (VEC)
               "MYH1", "MYH2","TNNC2", "ACTA1", #cluster 3 (muscle cells (fast twitch))
               "CD163L1", "MERTK", "MRC1", "MSR1", "CD163", "CD14", #cluster 4 (Macrophages)
-              "COL22A1", #cluster 5 (muscle cells, MTJ)
               "MYH7", #cluster 6 (muscle cells (slow twitch))
+              "COL22A1", #cluster 5 (muscle cells, MTJ)
               "BGN", "NOTCH3", "MYO1B", "PDGFRB",  "ACTA2", #cluster 7 (mural cells)
               "AQP7", "ADIPOQ", "PLIN1", #cluster 8 (adipocytes)
               "PTPRC", "CDC14A", "CD53", "PEBP1P3", "CD2", "CD5", #cluster 9 (NK-/T-cells)
               "PAX7", "CALCR","GREM1", #cluster 10 (satellite cells)
               "PROX1", "MMRN1", #cluster 11 (LEC)
               "CLDN1", "SCN7A", "VIT", "ABCA8", #cluster 12 (?)
-              "LAX1", "RGS13", "RHEX", "SLC18A2", "ALOX5", #cluster 13 (Granulocytes)
-               "MALAT1", "RNLS", "MT-RNR2", 
-              "FCRL1", "FCRL2", "FCRL5", "POU2AF1", "IGHG1", "FCMR", #cluster 15 (Plasma/B-cells)
-                "SLC5A7", "NRXN1", "CDH19", "XKR4", "L1CAM", "ZNF536", "PCSK2", "MYRF") #cluster 16 (Nervous system cells?)
+              "LAX1", "RGS13", "RHEX", "SLC18A2", "ALOX5") #cluster 13 (Granulocytes)
 
 #Together
-new.cluster.ids <- c("Fib (TENO/FMOD+)", "Fib (PDGFRA+)",  "VEC", "Muscle cells (fast twitch)","Macrophages", "Muscle cells (MTJ)","Muscle cells (slow twitch)", "Mural cells", "Adipocytes", "NK-/T-cells", "Satellite cells", "LEC", "Fib (SCN7A+)", "Granulocytes", "Muscle cells (other)", "Plasma/B-cells", "Nervous system cells")
+new.cluster.ids <- c("Fib (TENO/FMOD+)", "Fib (PDGFRA+)",  "VEC", "Muscle cells (fast twitch)","Macrophages", "Muscle cells (slow twitch)", "Muscle cells (MTJ)", "Mural cells", "Adipocytes", "NK-/T-cells", "Satellite cells", "LEC", "Fib (SCN7A+)", "Granulocytes")
 names(new.cluster.ids) <- levels(all.integrated)
 all.integrated <- RenameIdents(all.integrated, new.cluster.ids)
 
@@ -291,7 +303,9 @@ plot2 + scale_x_discrete(breaks=geneName, labels=geneName) + ggtitle("Average ge
 all.integrated$celltypes <- Idents(all.integrated)
 all.integrated$cluster_tendontype <- paste(all.integrated$celltypes, all.integrated$anatomical_site, sep = "_")
 
-all.integrated$cluster_tendontype <- factor(all.integrated$cluster_tendontype, levels = c("Fib (TENO/FMOD+)_Achilles", "Fib (TENO/FMOD+)_Hamstring", "Fib (PDGFRA+)_Achilles", "Fib (PDGFRA+)_Hamstring",  "VEC_Achilles", "VEC_Hamstring", "Muscle cells (fast twitch)_Achilles", "Muscle cells (fast twitch)_Hamstring","Macrophages_Achilles", "Macrophages_Hamstring", "Muscle cells (MTJ)_Achilles", "Muscle cells (MTJ)_Hamstring", "Muscle cells (slow twitch)_Achilles", "Muscle cells (slow twitch)_Hamstring", "Mural cells_Achilles", "Mural cells_Hamstring", "Adipocytes_Achilles", "Adipocytes_Hamstring", "NK-/T-cells_Achilles", "NK-/T-cells_Hamstring", "Satellite cells_Achilles", "Satellite cells_Hamstring", "LEC_Achilles", "LEC_Hamstring", "Fib (SCN7A+)_Achilles", "Fib (SCN7A+)_Hamstring", "Granulocytes_Achilles", "Granulocytes_Hamstring", "Muscle cells (other)_Achilles", "Muscle cells (other)_Hamstring", "Plasma/B-cells_Achilles", "Plasma/B-cells_Hamstring", "Nervous system cells_Achilles", "Nervous system cells_Hamstring"))
+all.integrated$cluster_tendontype <- factor(all.integrated$cluster_tendontype, levels = c("Fib (TENO/FMOD+)_Achilles", "Fib (TENO/FMOD+)_Hamstring", "Fib (PDGFRA+)_Achilles", "Fib (PDGFRA+)_Hamstring",  "VEC_Achilles", "VEC_Hamstring", "Muscle cells (fast twitch)_Achilles", "Muscle cells (fast twitch)_Hamstring","Macrophages_Achilles", "Macrophages_Hamstring", "Muscle cells (slow twitch)_Achilles", "Muscle cells (slow twitch)_Hamstring", "Muscle cells (MTJ)_Achilles", "Muscle cells (MTJ)_Hamstring","Mural cells_Achilles", "Mural cells_Hamstring", "Adipocytes_Achilles", "Adipocytes_Hamstring", "NK-/T-cells_Achilles", "NK-/T-cells_Hamstring", "Satellite cells_Achilles", "Satellite cells_Hamstring", "LEC_Achilles", "LEC_Hamstring", "Fib (SCN7A+)_Achilles", "Fib (SCN7A+)_Hamstring", "Granulocytes_Achilles", "Granulocytes_Hamstring"))
+
+#"Muscle cells (other)_Achilles", "Muscle cells (other)_Hamstring"
 
 all.integrated.split <- all.integrated
 Idents(all.integrated.split) <- all.integrated.split$cluster_tendontype
@@ -305,27 +319,28 @@ all.integrated <- FindClusters(all.integrated, resolution = 0.4)
 DimPlot(all.integrated, reduction = "umap", split.by = 'anatomical_site', label = TRUE, pt.size = 1)
 res0.4 <- DimPlot(all.integrated, reduction = "umap", split.by = 'anatomical_site', label = TRUE, pt.size = 1)
 res0.4 + ggtitle("Resolution 0.4")
+DimPlot(all.integrated, reduction = "umap", split.by = "sample", label = TRUE, label.size = 6) + ggtitle("Resolution 0.4 + all samples")
 ```
 #Annotate res 0.4
 ```{r, fig.width=15, fig.height=5}
 Idents(all.integrated) <- all.integrated$RNA_snn_res.0.4
-geneName <- c("COL1A1", "COL1A2", "COL3A1", "SCX", "MKX", "TNMD", "FBLN1", "FMOD", "COMP", "THBS4", #cluster 0 (fib TENO/FMOD+)
-             "FBLN2", "NOVA1", "NEGR1", "TNXB", "GSN", "SCARA5", "PDGFRA", "CD55", "CFH", #cluster 1 (fib PDGFRA+)
+geneName <- c("COL1A1", "COL1A2", "COL3A1", "DCN", "VCAN", "BGN", "SCX", "MKX", "TNMD", "FBLN1", "FMOD", "COMP", "THBS4", #cluster 0 (fib TENO/FMOD+)
+             "FBLN2", "NOVA1", "NEGR1", "TNXB", "SCARA5", "PDGFRA", "CFH", #cluster 1 (fib PDGFRA+)
               "PECAM1", "PTPRB", "VWF", "NOTCH4", "TEK", #cluster 2 (VEC)
-              "MYH1", "MYH2","ACTA1", "TNNC2", #cluster 5 (muscle (fast twitch))
-              "CD163L1", "MERTK", "MRC1", "MSR1", "CD163", "CD14", #cluster 4 (Macrophages)
+              "MYH1", "MYH2", #cluster 5 (muscle (fast twitch))
+              "CD163L1", "MERTK", "MRC1", "MSR1", "CD163", "CD14", "OSCAR", "OSTF1", "CD55", #cluster 4 (Macrophages)
               "COL22A1", #cluster 3 (Muscle MTJ)
-              "FABP3", "CASZ1", "FHL3", "PGM1", "AGL", "DENND2C", "MYH7", #cluster 6 (Muscle (slow twitch))
-             "BGN", "NOTCH3", "MYO1B", "PDGFRB",  "ACTA2", "GUCY1A2", "NEURL1B", "RGS5-AS1", "STEAP4", #cluster 7 (mural cells)
+              "FHL3", "PGM1", "AGL", "DENND2C", "MYH7", #cluster 6 (Muscle (slow twitch))
+             "NOTCH3", "MYO1B", "PDGFRB",  "ACTA2", "GUCY1A2", "NEURL1B", "RGS5-AS1", "STEAP4", #cluster 7 (mural cells)
              "AQP7", "ADIPOQ", "PLIN1", #cluster 8 (adipocytes)
-              "PTPRC", "CDC14A", "CD53", "PEBP1P3", "CD2", "CD5", #cluster 9 (NK-/T-cells)
+              "PTPRC", "CDC14A", "CD53", "PEBP1P3", "CD2", "CD3D", "CD3E", "CD3G", "CD5", #cluster 9 (NK-/T-cells)
              "PAX7", "CALCR","GREM1", #cluster 10 (satellite cells)
              "PROX1", "MMRN1", #cluster 11 (LEC)
               "CLDN1", "SCN7A", "VIT", "ABCA8", "COL8A1", "COL23A1", #cluster 12 ('Fib (SCN7A+)') "SLCA1" not found
              #"COL1A2", "COL3A2",  "DCN", "PRG4", (typical fib)
-              "LAX1", "RGS13", "RHEX", "SLC18A2", "ALOX5", #cluster 13 (Granulocytes)
+              "LAX1", "RGS13", "RHEX", "SLC18A2", "ALOX5", "KIT", #cluster 13 (Granulocytes)
             #"ASPM", "DIAPH3", #mitotic cells
-           "MALAT1", "RNLS", "MT-RNR2", #cluster 14  "CTNNA3", "DMD", "TTN", "PRKG1",, "SLC30A5" (too polluting)
+            "RNLS", #cluster 14  "CTNNA3", "DMD", "TTN", "PRKG1",, "SLC30A5" (too polluting)
             "FCRL1", "FCRL2", "FCRL5", "POU2AF1", "IGHG1", "FCMR", #cluster 15 (Plasma/B-cells)
             #"ATAD3B", "MTND1P23", "MTCO3P12", "PRDM16",
            "SLC5A7", "NRXN1", "CDH19", "XKR4", "L1CAM", "ZNF536", "PCSK2", "MYRF" #cluster 16 
@@ -421,16 +436,152 @@ geneName <- c("CEP63", "USP49", "XNDC1N", "MYL2", "TNNT1", "PRKAG1", "MRPS5", "P
 
 #Volcano plot results
 geneName <- c("CFH", "HHIP", "ITGA8", "THSD4", "LINC02839", "CADM2-AS1", "XNDC1N", "TRIM2", "LRRN2", "GALNT13", "RERG", #cluster0 fibs TENO/FMOD+
-              "RIGI", "A4GALT", "TNNC1", "SNX14", "MYL2", "RCAN1", "MECOM", "MMP3", "B3GALT1", "NEGR1", #cluster12 fibs PDGFRA+
+ 
+                           "RIGI", "A4GALT", "TNNC1", "SNX14", "MYL2", "RCAN1", "MECOM", "MMP3", "B3GALT1", "NEGR1", #cluster12 fibs PDGFRA+
               "PTGDS", "KANK4", "NRP2", "FKBP5", "ZBTB16") #cluster12 fibs SCN7A+ , "TTN", "CKM",  (very polluting and not contributing enough)
 ```
-#Pull amount of cells per cluster per tendon type
+
+#Pull amount of cells per cluster/tendon type/sample
 ```{r}
 library(data.table)
 library(magrittr)
 
+#per cluster per tendon type 
 all.integrated.split[["my.clusters"]] <- Idents(all.integrated.split)
 view(table(all.integrated.split@meta.data$my.clusters))
+
+#per cluster per sample
+all.integrated[["my.clusters"]] <- Idents(all.integrated)
+view(table(all.integrated@meta.data$my.clusters))
+table(all.integrated@meta.data$my.clusters, all.integrated@meta.data$orig.ident)
+
+#fib subset per tendon type
+sub.fib[["my.clusters"]] <- Idents(sub.fib)
+view(table(sub.fib@meta.data$my.clusters))
+```
+
+#Piecharts (fib clusters)
+```{r}
+library(RColorBrewer)
+library(ggplot2)
+myPalette <- brewer.pal(3, "Spectral")
+ham.pie.d <- c(1617, 1976, 58)
+ach.pie.d <- c(6545, 5215, 180)
+ham.pie <- pie(ham.pie.d, labels = c("Fib (TENO/FMOD+)", "Fib (PDFGRA+)", "Fib (SCN7A+)"), col= myPalette)
+ach.pie <- pie(ach.pie.d, labels = c("Fib (TENO/FMOD+)", "Fib (PDFGRA+)", "Fib (SCN7A+)"), col= myPalette)
+
+
+subset.group <- sample(c("Fib (TENO/FMOD+)", "Fib (PDFGRA+)", "Fib (SCN7A+)"), size = 100, replace = T)
+frequency.group <- sample(c("Hamstring", "Achilles"), size = 100, replace = T)
+subset.group <- factor(subset.group, levels = c("Fib (TENO/FMOD+)", "Fib (PDFGRA+)", "Fib (SCN7A+)"))
+data.pie <- data.frame(fibroblast_subset = subset.group, tendon_type = frequency.group)
+
+df.pie <- data.pie %>% 
+  group_by(fibroblast_subset) %>% # Variable to be transformed
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = `n` / sum(`n`)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc))
+
+ggplot(data.pie, aes(x = "", y = perc, fill = fibroblast_subset)) +
+  geom_col(color = "black") +
+  geom_label(aes(label = labels), color = c(1, "white", "white"),
+            position = position_stack(vjust = 0.5),
+            show.legend = FALSE) +
+  guides(fill = guide_legend(title = "Fibroblast_subset")) +
+  scale_fill_viridis_d() +
+  coord_polar(theta = "y") + 
+  theme_void()
+```
+
+#Stacked bar graphs
+```{r}
+library(ggplot2)
+library(scales)
+install.packages("ggthemes")
+library(ggthemes)
+library(dplyr)
+
+###Plot counts per sample 
+meta.data <- all.integrated[[]]
+
+counts <- group_by(meta.data, orig.ident, seurat_clusters) %>% dplyr::summarise(count = n())
+ggplot(counts, aes(seurat_clusters, count, fill = orig.ident)) + geom_bar(stat = 'identity')
+ggplot(meta.data, aes(x = seurat_clusters,
+               fill = orig.ident,
+               group = orig.ident)) +
+  geom_bar(position = "fill",
+           stat= "count") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+ggplot(counts, aes(orig.ident, count, fill = seurat_clusters)) + geom_bar(stat = 'identity') 
+
+
+###Plot counts per tendon type 
+meta.data <- all.integrated[[]]
+
+counts <- group_by(meta.data, anatomical_site, seurat_clusters) %>% dplyr::summarise(count = n())
+
+#Plot for absolute counts
+ggplot(counts, aes(anatomical_site, count, fill = seurat_clusters)) + geom_bar(stat = 'identity')
+
+#Plot for ratios
+ggplot(meta.data, aes(x = anatomical_site,
+               fill = seurat_clusters,
+               group = seurat_clusters)) +
+  geom_bar(position = "fill",
+           stat= "count") #+ scale_fill_viridis()
+#+ scale_fill_manual(values = c("#0072B2", "sienna3", "violetred3", "palegreen3", "#E69F00", "seagreen", "grey", "mediumpurple3", "tomato3", "goldenrod3", "#009E73", "burlywood1", "")) + ylab("Ratio")
+
+#Plots for counts per cluster (ham vs ach)
+ggplot(counts, aes(seurat_clusters, count, fill = anatomical_site)) + geom_bar(stat = 'identity') + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+ggplot(meta.data, aes(x = seurat_clusters,
+               fill = anatomical_site,
+               group = anatomical_site)) +
+  geom_bar(position = "fill",
+           stat= "count") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+#Plot for fibroblast subsets
+meta.data <- sub.fib[[]]
+
+counts <- group_by(meta.data, anatomical_site, seurat_clusters) %>% dplyr::summarise(count = n())
+
+#Plot for absolute counts
+ggplot(counts, aes(anatomical_site, count, fill = seurat_clusters)) + geom_bar(stat = 'identity')
+
+#Plot for ratios
+ggplot(meta.data, aes(x = anatomical_site,
+               fill = seurat_clusters,
+               group = seurat_clusters)) +
+  geom_bar(position = "fill",
+           stat= "count") + ylab("Ratio") + xlab("Tendon type") #+ scale_fill_manual(values = c("#0072B2", "sienna3", "violetred3", "palegreen3", "#E69F00", "seagreen", "grey", "mediumpurple3", "tomato3", "goldenrod3", "#009E73", "burlywood1", "#581845", "#DAF7A6", "#76D1D1", "#186F58", "#074C56")) + ylab("Ratio")
+
+#Plots for counts per cluster (ham vs ach)
+ggplot(counts, aes(seurat_clusters, count, fill = anatomical_site)) + geom_bar(stat = 'identity') + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + labs(fill= "Tendon type") + xlab("Fibroblast subsets")
+
+ggplot(meta.data, aes(x = seurat_clusters,
+               fill = anatomical_site,
+               group = anatomical_site)) +
+  geom_bar(position = "fill",
+           stat= "count") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))  + labs(fill= "Tendon type") + xlab("Fibroblast subsets") + ylab("Ratio")
+
+#remove(meta.data, counts) #cleanup
+```
+#Feed metadata with annotated cell types
+```{r}
+all.integrated$cell_type <- all.integrated$seurat_clusters
+levels(all.integrated$cell_type) <- c("Fib_(TENO/FMOD+)", "Fib_(PDGFRA+)", "VEC", "Muscle_cells_(fast_twitch)", "Macrophages", "Muscle_cells_(MTJ)", "Muscle_cells_(slow_twitch)", "Mural_cells", "Adipocytes", "NK-/T-cells","Satellite_cells", "LEC", "Fib_(SCN7A+)", "Granulocytes","Muscle cells_(other)","Plasma/B-cells", "Nervous_system_cells")
+
+all.integrated$fib_merged <- all.integrated$cell_type
+levels(all.integrated$fib_merged) <- c("Fib", "Fib", "VEC", "Muscle cells (fast twitch)", "Macrophages", "Muscle cells (MTJ)", "Muscle cells (slow twitch)", "Mural cells", "Adipocytes", "NK-/T-cells","Satellite cells", "LEC", "Fib", "Granulocytes","Muscle cells (other)","Plasma/B-cells", "Nervous system cells")
+
+#all.integrated$cell_type <- RenameIdents(object = all.integrated$seurat_clusters, `0` = "Fib (TENO/FMOD+)", `1` = "Fib (PDGFRA+)", `2` = "VEC", `3` = "Muscle cells (fast twtich", `4`= "Macrophages", `5` = "Muscle cells (MTJ)", `6` = "Muscle cells (slow twitch)", `7` = "Mural cells", `8` = "Adipocytes", `9` = "NK-T-cells", `10`= "Satellite cells", `11` = "LEC", `12` = "Fib (SCN7A+)", `13` = "Granulocytes", `14` = "Muscle cells (other)", `15` = "Plasma/B-cells", `16` = "Nervous system cells")
 ```
 
 #-----Pseudobulk------
@@ -462,13 +613,112 @@ cell_plot|cond_plot
 # 1. counts matrix - sample level
 # counts aggregate to sample level
 
+
+incomp.all <- SetIdent(object = all.integrated, cells.use = patient, ident.use = "patient")
+incomp.all <- incomp.all[, "MSK0782_Ham", "MSK0785-Ach-MB", "MSK1139_Ham", "MSK1216_Ham", "MSK1556-Ach-MB", "MSK1687-ACH-MB", "MSK1691-ACH-MB"]
+
+incomp.all <- incomp.all[, "MSK114"]
+incomp.all <- subset(incomp.all, idents = c("MSK0782", "MSK0785", "MSK1139", "MSK1216", "MSK1556", "MSK1687", "MSK1691"))
+incomp.all <- subset(incomp.all, idents = "MSK0782_Ham", "MSK0785-Ach-MB", "MSK1139_Ham", "MSK1216_Ham", "MSK1556-Ach-MB", "MSK1687-ACH-MB", "MSK1691-ACH-MB")
+
+  
+incomp.all$samples <- paste0(incomp.all$patient, incomp.all$anatomical_site)
+cts.int <- AggregateExpression(incomp.all, 
+                    group.by = c("seurat_clusters", "samples"),
+                    assays = 'RNA',
+                    slot = "counts",
+                    return.seurat = FALSE)
+cts.int <- cts.int$RNA
+cts.int
+cts.int.t <- t(cts.int)
+
+view(cts.int.t)
+cts.int.t <- as.data.frame(cts.int.t)
+splitRows.int <- gsub('_.*', '', rownames(cts.int.t))
+cts.int.split <- split.data.frame(cts.int.t,
+                 f = factor(splitRows.int), 
+                 drop = TRUE)
+
+cts.int.split$'g0'[, 1:10] #Have a look at cell type/cluster 0 
+cts.int.split$'g1'[, 1:10]
+
+counts_fibs <- cts.int.split[[12]]
+counts_fibs <- t(rownames_change(cts.int.split[['g0', 'g1', 'g12']]))
+
+counts_fib <- merge(cts.int.split$"g0", cts.int.split$"g1", by = "")
+counts_0 <- t(rownames_change(cts.int.split$'g0')) #nrow 61722
+counts_1 <- t(rownames_change(cts.int.split$'g1')) #nrow 61722
+counts_2 <- t(rownames_change(cts.int.split$'g2')) #nrow 61722
+counts_3 <- t(rownames_change(cts.int.split$'g3')) #nrow 61722
+counts_4 <- t(rownames_change(cts.int.split$'g4')) #nrow 61722
+counts_5 <- t(rownames_change(cts.int.split$'g5')) #nrow 61722
+counts_6 <- t(rownames_change(cts.int.split$'g6')) #nrow 61722
+counts_7 <- t(rownames_change(cts.int.split$'g7')) #nrow 61722
+counts_8 <- t(rownames_change(cts.int.split$'g8')) #nrow 61722
+counts_9 <- t(rownames_change(cts.int.split$'g9')) #nrow 61722
+counts_10 <- t(rownames_change(cts.int.split$'g10')) #nrow 61722
+counts_11 <- t(rownames_change(cts.int.split$'g11')) #nrow 61722
+counts_12 <- t(rownames_change(cts.int.split$'g12')) #nrow 61722
+counts_13 <- t(rownames_change(cts.int.split$'g13')) #nrow 61722
+counts_14 <- t(rownames_change(cts.int.split$'g14')) #nrow 61722
+counts_15 <- t(rownames_change(cts.int.split$'g15')) #nrow 61722
+counts_16 <- t(rownames_change(cts.int.split$'g16'))
+
+counts_fibs <- Idents(cts.int.split, value = "seurat_clusters")
+counts_fibs <- cts.int.split[["g0", "g1", "g12"]]
+
+counts_fib0 <- as.data.frame(counts_0)
+counts_fib1 <- as.data.frame(counts_1)
+counts_fib12 <- as.data.frame(counts_12)
+counts_fibs <- c(counts_fib0, counts_fib1, counts_fib12)
+purrr::reduce(counts_fibs, full_join, )
+f
+counts_0782 <- rbind(pattern = "MSK0782")
+counts_0785 <- rbind(pattern = "MSK0785")
+counts_1139 <- rbind(pattern = "MSK1139")
+counts_1216 <- rbind(pattern = "MSK1216")
+counts_
+counts_fibs <- (counts_fib0, counts_fib1, counts_fib12)
+
+# 2. generate sample level metadata
+colData <- data.frame(samples = colnames(counts_fibs))
+
+colData <- colData %>%
+  mutate(condition = ifelse(grepl('Achilles', samples), "Achilles", "Hamstring")) %>% 
+  column_to_rownames(var = 'samples')
+
+#'MSK0782', 'MSK0785', 'MSK1139', 'MSK1144', 'MSK1216', 'MSK1556', 'MSK1687', 'MSK1691'
+# get more information from metadata
+
+# perform DESeq2 --------
+# Create DESeq2 object   
+dds <- DESeqDataSetFromMatrix(countData = counts_fibs,
+                       colData = colData,
+                       design = ~ condition)
+
+# filter (keep the genes that have a minimum of 10 reads)
+keep <- rowSums(counts(dds)) >=10
+dds <- dds[keep,]
+
+# run DESeq2
+dds <- DESeq(dds)
+
+# Check the coefficients for the comparison
+resultsNames(dds)
+
+# Generate results object
+res <- results(dds, name = "condition_Hamstring_vs_Achilles")
+res
+
+
+#OVERALL
 View(all.integrated@meta.data)
 all.integrated$samples <- paste0(all.integrated$patient, all.integrated$anatomical_site)
 
 DefaultAssay(all.integrated)
 
 cts <- AggregateExpression(all.integrated, 
-                    group.by = c("seurat_clusters", "samples"),
+                    group.by = c("fib_merged", "samples"),
                     assays = 'RNA',
                     slot = "counts",
                     return.seurat = FALSE)
@@ -492,21 +742,11 @@ cts.split <- split.data.frame(cts.t,
                  f = factor(splitRows), 
                  drop = TRUE)
 
-cts.split$'0'[, 1:10] #Have a look at cell type/cluster 0 
-cts.split$'1'[, 1:10]
+cts.split$'Fib'[, 1:10] #Have a look at cell type/cluster 0 
+cts.split$'g1'[, 1:10]
 
 # fix colnames and transpose function
 library(data.table)
-
-#cts.split.modified <- lapply(cts.split, function(x){
-#  rownames(x) <- gsub('.*_(.*)', '\\1', rownames(x))
-#  t(x)
-#})
-
-#cts.split.modified$'0'[1:10,1:10]
-#cts.split.modified <- as.matrix(cts.split.modified)
-#view(cts.split.modified) #dims = nrow 61722, ncol 109
-
 
 # Manually use rownames_change on cell types (0-15)
 rownames_change <- function(x){
@@ -539,26 +779,27 @@ rownames_change <- function(x){
 
 # Let's run DE analysis with cluster 0
 # 1. Get counts matrix
-counts_0 <- t(rownames_change(cts.split$'0')) #nrow 61722
-counts_1 <- t(rownames_change(cts.split$'1')) #nrow 61722
-counts_2 <- t(rownames_change(cts.split$'2')) #nrow 61722
-counts_3 <- t(rownames_change(cts.split$'3')) #nrow 61722
-counts_4 <- t(rownames_change(cts.split$'4')) #nrow 61722
-counts_5 <- t(rownames_change(cts.split$'5')) #nrow 61722
-counts_6 <- t(rownames_change(cts.split$'6')) #nrow 61722
-counts_7 <- t(rownames_change(cts.split$'7')) #nrow 61722
-counts_8 <- t(rownames_change(cts.split$'8')) #nrow 61722
-counts_9 <- t(rownames_change(cts.split$'9')) #nrow 61722
-counts_10 <- t(rownames_change(cts.split$'10')) #nrow 61722
-counts_11 <- t(rownames_change(cts.split$'11')) #nrow 61722
-counts_12 <- t(rownames_change(cts.split$'12')) #nrow 61722
-counts_13 <- t(rownames_change(cts.split$'13')) #nrow 61722
-counts_14 <- t(rownames_change(cts.split$'14')) #nrow 61722
-counts_15 <- t(rownames_change(cts.split$'15')) #nrow 61722
-counts_16 <- t(rownames_change(cts.split$'16'))
+counts_fibs <- t(rownames_change(cts.split$'Fib')) 
+counts_0 <- t(rownames_change(cts.split$'g0')) #nrow 61722
+counts_1 <- t(rownames_change(cts.split$'g1')) #nrow 61722
+counts_2 <- t(rownames_change(cts.split$'g2')) #nrow 61722
+counts_3 <- t(rownames_change(cts.split$'g3')) #nrow 61722
+counts_4 <- t(rownames_change(cts.split$'g4')) #nrow 61722
+counts_5 <- t(rownames_change(cts.split$'g5')) #nrow 61722
+counts_6 <- t(rownames_change(cts.split$'g6')) #nrow 61722
+counts_7 <- t(rownames_change(cts.split$'g7')) #nrow 61722
+counts_8 <- t(rownames_change(cts.split$'g8')) #nrow 61722
+counts_9 <- t(rownames_change(cts.split$'g9')) #nrow 61722
+counts_10 <- t(rownames_change(cts.split$'g10')) #nrow 61722
+counts_11 <- t(rownames_change(cts.split$'g11')) #nrow 61722
+counts_12 <- t(rownames_change(cts.split$'g12')) #nrow 61722
+counts_13 <- t(rownames_change(cts.split$'g13')) #nrow 61722
+counts_14 <- t(rownames_change(cts.split$'g14')) #nrow 61722
+counts_15 <- t(rownames_change(cts.split$'g15')) #nrow 61722
+counts_16 <- t(rownames_change(cts.split$'g16'))
 
 # 2. generate sample level metadata
-colData <- data.frame(samples = colnames(counts_0))
+colData <- data.frame(samples = colnames(counts_fibs))
 
 colData <- colData %>%
   mutate(condition = ifelse(grepl('Achilles', samples), "Achilles", "Hamstring")) %>% 
@@ -569,7 +810,7 @@ colData <- colData %>%
 
 # perform DESeq2 --------
 # Create DESeq2 object   
-dds <- DESeqDataSetFromMatrix(countData = counts_0,
+dds <- DESeqDataSetFromMatrix(countData = counts_fibs,
                        colData = colData,
                        design = ~ condition)
 
@@ -591,11 +832,13 @@ res
 summary(res) #here you see that the adjusted p-value is <0.1. We can adjust that to 0.01;
 res0.01 <- results(dds, alpha = 0.01)
 summary(res0.01) #--> different (lower) numbers of upregulated and downregulated genes
-
+res0.01
 #Contrasts
 #You can use this to compare between multiple levels
 resultsNames(dds)
 
+res.mat <- as.matrix(res)
+res.mat
 #MA plot
 plotMA(res) #--> blue genes are the SIGNIFICANTLY (adjusted p-value of 0.05) differentially expressed genes
 
@@ -692,6 +935,13 @@ counts_total <- cbind(counts_ach, counts_ham)
 # 2. generate sample level metadata
 colData.2 <- data.frame(samples.2 = colnames(counts_total))
 
+#fib0 <- subset(colData.2, select = grepl("0MSK", names(colData.2)))
+
+#Subset <- function(df, pattern){
+#  ind <- grepl(pattern, names(df))
+#  df[,ind]
+#}
+
 colData.2 <- colData.2 %>%
   mutate(condition = ifelse(grepl('ACH', samples.2, ignore.case = T), "Achilles", "Hamstring")) %>% 
   column_to_rownames(var = 'samples.2')
@@ -747,10 +997,12 @@ cell_plot|cond_plot
 View(sub.fib@meta.data)
 sub.fib$samples <- paste0(sub.fib$patient, sub.fib$anatomical_site)
 
+sub.fib$samples1 <- paste0(sub.fib$orig.ident, sub.fib$cell_type)
+
 DefaultAssay(sub.fib)
 
 cts.fib <- AggregateExpression(sub.fib, 
-                    group.by = c("seurat_clusters", "samples"),
+                    group.by = c("seurat_clusters", "samples1"),
                     assays = 'RNA',
                     slot = "counts",
                     return.seurat = FALSE)
@@ -768,15 +1020,16 @@ cts.fib.t <- as.data.frame(cts.fib.t)
 
 # get values where to split
 splitRows.fib <- gsub('_.*', '', rownames(cts.fib.t))
+#splitRows.fib <- gsub(pattern = ".", '', rownames(splitRows.fib))
 
 # split data.frame
 cts.fib.split <- split.data.frame(cts.fib.t,
                  f = factor(splitRows.fib), 
                  drop = TRUE)
 
-cts.fib.split$'0'[, 1:10] #Have a look at cell type/cluster 0 
-cts.fib.split$'1'[, 1:10]
-cts.fib.split$'12'[, 1:10]
+cts.fib.split$'g0'[, 1:10] #Have a look at cell type/cluster 0 
+cts.fib.split$'g1'[, 1:10]
+cts.fib.split$'g12'[, 1:10]
 
 # Manually use rownames_change on cell types (0-15)
 rownames_change <- function(x){
@@ -786,12 +1039,12 @@ rownames_change <- function(x){
 
 # Let's run DE analysis with cluster 0
 # 1. Get counts matrix
-counts_fib0 <- t(rownames_change(cts.split$'0')) #nrow 61722
-counts_fib1 <- t(rownames_change(cts.split$'1')) #nrow 61722
-counts_fib12 <- t(rownames_change(cts.split$'12')) #nrow 61722
+counts_fib0 <- t(rownames_change(cts.fib.split$'g0')) #nrow 61722
+counts_fib1 <- t(rownames_change(cts.fib.split$'g1')) #nrow 61722
+counts_fib12 <- t(rownames_change(cts.fib.split$'g12')) #nrow 61722
 
 # 2. generate sample level metadata
-colData <- data.frame(samples = colnames(counts_fib12))
+colData <- data.frame(samples = colnames(counts_fib0))
 
 colData <- colData %>%
   mutate(condition = ifelse(grepl('Achilles', samples), "Achilles", "Hamstring")) %>% 
@@ -799,7 +1052,7 @@ colData <- colData %>%
 
 # perform DESeq2 --------
 # Create DESeq2 object   
-dds.fib <- DESeqDataSetFromMatrix(countData = counts_fib12,
+dds.fib <- DESeqDataSetFromMatrix(countData = counts_fib0,
                        colData = colData,
                        design = ~ condition)
 
@@ -822,13 +1075,19 @@ summary(res.fib) #here you see that the adjusted p-value is <0.1. We can adjust 
 res.fib0.01 <- results(dds.fib, alpha = 0.01)
 summary(res.fib0.01) #--> different (lower) numbers of upregulated and downregulated genes
 
+view(res.fib[c('COL1A1', 'COL1A2', 'COL3A1', 'VCAN', 'BGN'),])
+view(res.fib0.01[c('COL1A1', 'COL1A2', 'COL3A1', 'VCAN', 'BGN'),])
 #Contrasts
 #You can use this to compare between multiple levels
 resultsNames(dds)
 
+#View table with results 
+view(res[order(-res$stat),])
+
 #MA plot
 plotMA(res.fib) #--> blue genes are the SIGNIFICANTLY (adjusted p-value of 0.05) differentially expressed genes
 
+plotDispEsts(dds.fib)
 #plotWithHighlights(res$baseMean, res$log2FoldChange)
 ```
 
@@ -844,7 +1103,7 @@ plotMA(res.fib) #--> blue genes are the SIGNIFICANTLY (adjusted p-value of 0.05)
 #Volcano plot
 ```{r}
 #selectLab = proteoglycans
-EnhancedVolcano(res.fib, lab = rownames(res.fib), x = 'log2FoldChange', y = 'padj', title = 'Fibs (SCN7A+) vs other fibs: Hamstring vs Achilles', pCutoff = 0.05, FCcutoff = 0.5, pointSize = 3.0, labSize = 6.0, colAlpha = 1)
+EnhancedVolcano(res, lab = rownames(res), x = 'log2FoldChange', y = 'pvalue', title = 'All fibs: Hamstring vs Achilles', pCutoff = 0.05, FCcutoff = 0.5, pointSize = 3.0, labSize = 6.0, colAlpha = 1)
 
 #EnhancedVolcano(res, lab = rownames(res), x = 'log2FoldChange', selectLab = matri.genes, y = 'padj', title = 'Cluster 7: matrisome genes (Hamstring vs Achilles)', pCutoff = 0.05, FCcutoff = 0.5, pointSize = 3.0, labSize = 6.0, colAlpha = 1)
 #EnhancedVolcano(res, lab = rownames(res), x = 'log2FoldChange', selectLab = core.matri, y = 'padj', title = 'Cluster 7: core matrisome (Hamstring vs Achilles)', pCutoff = 0.05, FCcutoff = 0.5, pointSize = 3.0, labSize = 6.0, colAlpha = 1)
@@ -853,9 +1112,6 @@ EnhancedVolcano(res.fib, lab = rownames(res.fib), x = 'log2FoldChange', y = 'pad
 #EnhancedVolcano(res, lab = rownames(res), x = 'log2FoldChange', selectLab = proteoglycans, y = 'padj', title = 'Cluster 7: proteoglycans (Hamstring vs Achilles)', pCutoff = 0.05, FCcutoff = 0.5, pointSize = 3.0, labSize = 6.0, colAlpha = 1)
 #EnhancedVolcano(res, lab = rownames(res), x = 'log2FoldChange', selectLab = assoc.matri, y = 'padj', title = 'Cluster 7: associate matrisome (Hamstring vs Achilles)', pCutoff = 0.05, FCcutoff = 0.5, pointSize = 3.0, labSize = 6.0, colAlpha = 1)
 ```
-
-
-
 
 
 #Cluster 15 + 16 FindMarkers
@@ -867,60 +1123,144 @@ head(cluster15.ident, n=10)
 #head(cluster16.ident, n=10)
 ```
 
+#Heatmap to show success integration
+```{r, fig.width = 10, fig.height = 20}
+general.markers <- FindAllMarkers(all.integrated, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+
+general.markers %>%
+    group_by(cluster) %>%
+    top_n(n = 10, wt = avg_log2FC) -> top10
+
+DoHeatmap(all.integrated, features = top10$gene) + scale_fill_viridis() + NoLegend()
+```
+
 #Heatmap (complex/pheatmap/DoHeatmap)
-```{r}
+```{r, fig.width = 10, fig.height = 20}
 library(pheatmap)
 library(RColorBrewer)
 BiocManager::install("ComplexHeatmap")
 library(ComplexHeatmap)
+BiocManager::install("org.Hs.eg.db")
+library("org.Hs.eg.db")
 
 #all.integrated.small <- min(table(Idents(all.integrated)))
+
+core.matri.2 <- as.data.frame(core.matri)
+core.matri.2 <- as.matrix(core.matri)
+row.names(core.matri.2) <- core.matri.2 
+
+myvars <- names(mat.z.fib) %in% core.matri
 
 #top10markers <- 
 #heatmap <- DoHeatmap(subset(all.integrated, downsample = 500),
           #features = unique(top10markers$gene), assay = "RNA", group.by = "anatomical_site") + scale_fill_viridis() + ggtitle("Heatmap of top 10 markers")
 
-res.df <- as.data.frame(res)
-res.df
+mat.fib <- counts(dds.fib, normalized = T)[rownames(res.fib.2),]
+mat.fib
 
-mat <- counts(dds, normalized = T)[rownames(res.df),]
+df.fib <- data.frame(check.names = F)%>%
+  mutate(gene= row.names(mat.fib))
 
 #find the z-value
-mat.z <- t(apply(mat, 1, scale))
-colnames(mat.z) <- rownames(colData)
-mat.z
+mat.z.fib <- t(apply(mat.fib, 1, scale))
+colnames(mat.z.fib) <- rownames(colData)
+mat.z.fib
 
-Heatmap(mat.z, cluster_rows = T, cluster_columns = T, column_labels = colnames(mat.z), 
+#Heatmap 
+Heatmap(mat.z.fib, cluster_rows = T, cluster_columns = T, row_labels = core.matri.2, column_labels = colnames(mat.z.fib),
         name = "Z-score")
 
-submat.z <- head(mat.z, n=500)
-pheatmap(submat.z)
+subdat <- mat.z.fib[rownames(core.matri.2) == rownames(mat.z.fib)]
+
+nrow(mat.z.fib) #83
+
+subdat <- subset(mat.z.fib, subset = (rownames = core.matri.2))
+subdat <- mat.z.fib[rownames = core.matri.2, ]
+
+subdat <- mat.z.fib %>%
+  as.data.frame(mat.z.fib)
+  
+  dplyr::filter(core.matri.2$core.matri %in% rownames)
+
+#submat.z <- head(mat.z, n=500)
+#pheatmap(submat.z)
 ```
-
-#Venn diagram
+#Heatmap (complex)
 ```{r}
-BiocManager::install("VennDiagram")
-library(VennDiagram)
-if (!require(devtools)) install.packages("devtools")
-devtools::install_github("yanlinlin82/ggvenn")
-library(ggvenn)
+sigs <- sigs[sigs$padj <0.05,]
+df <- as.data.frame(sigs)
 
+#for non-mapped labels
+keys <- list(core.matri)
+l <- list()
 
-#a <- list(sub.fib.1)
-#b <- list(sub.fib.2)
-#c <- list (sub.fib.3)
-#ggvenn(a)
+res.fib.2 <- as.data.frame(res.fib)
+res.fib.2$symbol <- mapIds(org.Hs.eg.db, keys = rownames(res.fib.2), keytype = "SYMBOL", column = "SYMBOL")
 
+#Filtering steps (to make the heatmap readable)
+res.fib.2 <- res.fib.2[(res.fib.2$baseMean > 100) & (abs(res.fib.2$log2FoldChange) > 2.1),] #absolute value because we want both pos and neg values
+res.fib.2 <- res.fib.2[order(res.fib.2$log2FoldChange, decreasing = T),]
+
+rlog_out <- rlog(dds.fib, blind=F)
+mat <- assay(rlog_out)[rownames(res.fib.2), rownames(colData)]
+colnames(mat) <- rownames(colData)
+base_mean <- rowMeans(mat)
+mat.scaled <- t(apply(mat, 1, scale))
+colnames(mat.scaled) <- colnames(mat)
+
+#Keep 25 highest en 25 lowest expressed genes
+num_keep <- 25 
+rows_keep <- c(seq(1:num_keep), seq((nrow(mat.scaled)-num_keep), nrow(mat.scaled)))
+
+#Log2 value & mean(average expression) columns in dataframe
+l2_val <- as.matrix(res.fib.2[rows_keep,]$log2FoldChange)
+colnames(l2_val) <- "logFC"
+
+mean <- as.matrix(res.fib.2[rows_keep,]$baseMean)
+colnames(mean) <- "AveExpr"
+
+#Maps values between b/w/r for min and max 12 values
+col_logFC <- colorRamp2(c(min(l2_val), 0, max(l2_val)), c("blue", "white", "red"))
+
+#Maps between 0% quantile, and 75% quantile of mean values ---- 0, 25, 50, 75, 100
+col_AveExpr <- colorRamp2(c(quantile(mean)[1], quantile(mean)[4]),c("white", "red"))
+
+#Annotate and plot heatmap
+hann <- HeatmapAnnotation(summary = anno_summary(gp = gpar(fill=2), 
+                                               height = unit(2,"cm")))
+
+ha <- Heatmap(mat.scaled[rows_keep,], cluster_rows= F, 
+              column_labels = colnames(mat.scaled), name = "Z-score", 
+              cluster_columns = T)
+
+hb <- Heatmap(l2_val, row_labels = res.fib.2$symbol[rows_keep], 
+              cluster_rows = F, name = "logFC", top_annotation = hann, col=col_logFC, 
+              cell_fun = function(j, i, x, y, w, h, col) {
+                grid.text(round(l2_val[i, j], 2), x, y)
+              })
+
+hc <- Heatmap(mean, row_labels = res.fib.2$symbol[rows_keep], 
+              cluster_rows = F, name = "AveExpr", col=col_AveExpr, 
+              cell_fun = function(j, i, x, y, w, h, col) {
+                grid.text(round(mean[i, j], 2), x, y)
+              })
+
+h2 <- ha+hb+hc
+h2
 ```
 
 #subset fibs
 ```{r}
-sub.fib <-subset(x = all.integrated.split, idents = c("Fib (PDGFRA+)_Achilles", "Fib (PDGFRA+)_Hamstring", "Fib (TENO/FMOD+)_Achilles", "Fib (TENO/FMOD+)_Hamstring", "Fib (SCN7A+)_Achilles", "Fib (SCN7A+)_Hamstring"))
+sub.fib.split <-subset(x = all.integrated.split, idents = c("Fib (PDGFRA+)_Achilles", "Fib (PDGFRA+)_Hamstring", "Fib (TENO/FMOD+)_Achilles", "Fib (TENO/FMOD+)_Hamstring", "Fib (SCN7A+)_Achilles", "Fib (SCN7A+)_Hamstring"))
+DimPlot(sub.fib.split, reduction = "umap", repel = TRUE, label = TRUE, label.size = 3.5, pt.size = 0.8) 
+
+sub.fib <-subset(x = all.integrated, idents = c("Fib (PDGFRA+)", "Fib (TENO/FMOD+)","Fib (SCN7A+)"))
 DimPlot(sub.fib, reduction = "umap", repel = TRUE, label = TRUE, label.size = 3.5, pt.size = 0.8) 
 #sub.fib.1 <-subset(x = all.integrated.split, idents = c("Fib (PDGFRA+)_Achilles", "Fib (PDGFRA+)_Hamstring", "Fib (TENO/FMOD+)_Achilles", "Fib (TENO/FMOD+)_Hamstring"))
 #sub.fib.2 <- subset(x = all.integrated.split, idents = c("Fib (TENO/FMOD+)_Achilles", "Fib (TENO/FMOD+)_Hamstring", "Fib (SCN7A+)_Achilles", "Fib (SCN7A+)_Hamstring"))
 #sub.fib.3 <- subset(x = all.integrated.split, idents = c("Fib (PDGFRA+)_Achilles", "Fib (PDGFRA+)_Hamstring", "Fib (SCN7A+)_Achilles", "Fib (SCN7A+)_Hamstring"))
 ```
+
 #Other markers for subset fibs
 ```{r, fig.width=14, fig.height=6}
 geneName <- c("ABCA8", "COL15A1", "CD44", "DCLK1", "ELN", "FBN1", "FBLN1", "FBLN2", "FBLN5", "KCND2", "NEGR1", "NOVA1", "PDGFRA", "VIT", 
@@ -960,42 +1300,11 @@ plot7 <- DotPlot(sub.fib, features = rev(geneName), cols = c("blue", "red"))
 plot7 + ggtitle("Subsetted fibroblast- Carla Markers fibs. Ham vs Ach (res0.4)") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 ```
 
-#Apoptosis pathway analysis
-```{r}
-BiocManager::install("XML")
-library(XML)
-apoptosis.list <- xmlParse("~/Documents/Oxford/Coding/Pathway files/HALLMARK_APOPTOSIS.v2023.2.Hs.xml")
-apoapoptosis.list <- list(apoptosis.list)
-BiocManager::install("gprofiler2")
-library(gprofiler2)
-
-library(RColorBrewer)
-BiocManager::install("fgsea")
-library(fgsea)
-
-#set relevant paths
-list.files()
-
-#functions
-matrix_to_list <- function(pws){
-  pws.l <- list()
-  for (pw in colnames(pws)) {
-    pws.l[[pw]] <- rownames(pws)[as.logical(pws[,pw])]
-  }
-  return(pws.l)
-}
-
-tendon_list
-```
-
 #GSEA prep
 ```{r}
-gostres <- gost(query = res.ordered, organism = "hsapiens", correction_method = "g_SCS", domain_scope = "annotated")
+gostres <- gost(query = res., organism = "hsapiens", correction_method = "g_SCS", domain_scope = "annotated")
 
 BiocManager::install("org.Hs.eg.db")
-
-if (!require("BiocManager", quietly = T))
-    install.packages("BiocManager")
 
 BiocManager::install("clusterProfiler")
 BiocManager::install("AnnotationDbi")
@@ -1004,11 +1313,62 @@ library(clusterProfiler)
 library(gprofiler2)
 ```
 
+#Up or down regulated genes? And remove non-significant genes + NA's
+```{r}
+res.df <- as.data.frame(res)
+df.reg <- res.df %>% mutate(diffexpressed = case_when(
+  log2FoldChange > 0 & padj <0.05 ~ 'UP', 
+  log2FoldChange < 0 & padj <0.05 ~ 'DOWN', 
+  padj > 0.05 ~ 'NO'
+))
+
+df.reg <- df.reg[df.reg$diffexpressed != 'NO',]
+df.reg <- na.omit(df.reg)
+
+#Split the dataframe into a list of sub-dataframes: upregulated/downregulated genes
+deg_results_list <- split(df.reg, df.reg$diffexpressed)
+```
+
 #GSEA (Ach vs Ham DE analysis)
 For the Wald test, stat is the Wald statistic: the log2FoldChange divided by lfcSE, which is compared to a standard Normal distribution to generate a two-tailed pvalue. For the likelihood ratio test (LRT), stat is the difference in deviance between the reduced model and the full model, which is compared to a chi-squared distribution to generate a pvalue.
+```{r, height = 20, width = 5}
+#background genes (Hallmark, Gene ontology, KEGG)
+genes_in_data <- rownames(res.fib)
+
+sigs <- na.omit(res.fib)
+sigs <- sigs[sigs$padj <0.05 & sigs$baseMean > 50,]
+sigs 
+genes_to_test <- rownames(sigs[sigs$log2FoldChange > 0.5,])
+GO_results <- enrichGO(genes_to_test, OrgDb = "org.Hs.eg.db", 
+                       keyType= "SYMBOL", 
+                       ont = "BP") #BP = biological processes
+
+fit <- plot(barplot(GO_results, showCategory = 20))      
+p1 <- dotplot(GO_results, showCategory = 20)
+p1
+p2 <- cnetplot(GO_results, colorEdge = T, ciruclar = T, color_category = "deepskyblue4", color_gene = "burlywood1")
+p2
+p3 <- heatplot(GO_results, showCategory = 5)
+p3
+
+GO_results2 <- pairwise_termsim(GO_results)
+p4 <- treeplot(GO_results2)
+p4
+
+p5 <- emapplot(GO_results2)
+p5
+
+p6 <- upsetplot(GO_results2)
+p6
+```
+
+#Other GSEA
 ```{r}
-res.ordered <- res.2[order(-res.2$stat),]
+res.fib[["g1"]]
+res.ordered <- res[order(-res$stat),]
 res.ordered
+
+#res.fib[order(res.fib$pvalue),]
 
 gene_list_GSEA <- res.ordered$stat
 names(gene_list_GSEA) <- rownames(res.ordered)
@@ -1026,9 +1386,28 @@ view(gse)
 #Plot
 gseaplot(gse, geneSetID = 1)
 
+enrichres <- new("enrichResult", 
+                 readable = F, 
+                 result = ,
+                 pvalueCutoff = 0.05, 
+                 pAdjustMethod  = "BH", 
+                 qvalueCutoff= 0.2, 
+                 organism = "human", 
+                 ontology = "UNKNOWN", 
+                 gene = )
+#Barplot
+library(enrichplot)
+library(DOSE)
+install.packages("ggupset")
+library(ggupset)
+
+gse <- as.matrix(gse)
+b1 <- plot(barplot(gse, showCategory = 20))
+b1 <- barplot(gse, showCategory = 20)
+b2 <- mutate(gse, qscore = -log(p.adjust, base = 10)) %>% barplot(x="qscore")
+
 #Results: 
 # "NRBP2", "VTA1", "LRSAM1","SUPT5H", "YOD1", "ULK1", "STAM2" --> autophagy (ES; -0.4899642, pvalue; 5.966960e-15)
 ```
-
 
 
