@@ -1,0 +1,495 @@
+---
+title: "Clean_Script_2"
+output: html_document
+date: "2023-12-08"
+author: "Marie Chevalier"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script contains the focus on the tendon fibroblasts.
+
+#Pseudobulk and DE analysis per cluster
+```{r}
+# visualise the distribution of clusters based on sample (patient) 
+cell_plot <- DimPlot(all.integrated, reduction = 'umap', group.by = 'seurat_clusters', label = TRUE)
+cond_plot <- DimPlot(all.integrated, reduction = 'umap', group.by = 'patient')
+cell_plot|cond_plot
+
+# pseudo-bulk workflow -----------------------------------------------------------------------------
+
+# 1. counts matrix - sample level
+
+#New column in metadata: patient and anatomical site combined
+all.integrated$samples <- paste0(all.integrated$patient, all.integrated$anatomical_site)
+
+#Aggregation of counts to sample level
+cts <- AggregateExpression(all.integrated, 
+                    group.by = c("seurat_clusters", "samples"),
+                    assays = 'RNA',
+                    slot = "counts",
+                    return.seurat = FALSE)
+cts <- cts$RNA
+
+# transpose the columns to rows 
+cts.t <- t(cts)
+
+# convert matrix to data frame
+cts.t <- as.data.frame(cts.t)
+
+# get values where to split
+splitRows <- gsub('_.*', '', rownames(cts.t))
+
+# split data.frame
+cts.split <- split.data.frame(cts.t,
+                 f = factor(splitRows), 
+                 drop = TRUE)
+
+cts.split$'0'[, 1:10] #Have a look at cell type/cluster 0 to check 
+
+
+# fix colnames and transpose function
+rownames_change <- function(x){
+  rownames(x) <- gsub('.*_(.*)', '\\1', rownames(x))
+  return(x)
+}
+
+# Manually use rownames_change on cell types (0-16)
+counts_0 <- t(rownames_change(cts.split$'0')) 
+counts_1 <- t(rownames_change(cts.split$'1')) 
+counts_2 <- t(rownames_change(cts.split$'2')) 
+counts_3 <- t(rownames_change(cts.split$'3')) 
+counts_4 <- t(rownames_change(cts.split$'4')) 
+counts_5 <- t(rownames_change(cts.split$'5')) 
+counts_6 <- t(rownames_change(cts.split$'6')) 
+counts_7 <- t(rownames_change(cts.split$'7')) 
+counts_8 <- t(rownames_change(cts.split$'8')) 
+counts_9 <- t(rownames_change(cts.split$'9')) 
+counts_10 <- t(rownames_change(cts.split$'10')) 
+counts_11 <- t(rownames_change(cts.split$'11')) 
+counts_12 <- t(rownames_change(cts.split$'12')) 
+counts_13 <- t(rownames_change(cts.split$'13')) 
+counts_14 <- t(rownames_change(cts.split$'14')) 
+counts_15 <- t(rownames_change(cts.split$'15')) 
+counts_16 <- t(rownames_change(cts.split$'16')) 
+
+# 2. generate sample level metadata (for cluster 0, in this example)
+colData <- data.frame(samples = colnames(counts_0))
+colData <- colData %>%
+  mutate(condition = ifelse(grepl('Achilles', samples), "Achilles", "Hamstring")) %>% 
+  column_to_rownames(var = 'samples')
+
+# 3. perform DESeq2 (on cluster 0, in this example)
+
+# Create DESeq2 object   
+dds <- DESeqDataSetFromMatrix(countData = counts_0,
+                       colData = colData,
+                       design = ~ condition)
+
+# filter (keep the genes that have a minimum of 10 reads)
+keep <- rowSums(counts(dds)) >=10
+dds <- dds[keep,]
+
+# run DESeq2
+dds <- DESeq(dds)
+
+# Check the coefficients for the comparison 
+resultsNames(dds)
+
+# Generate results object 
+res <- results(dds, name = "condition_Hamstring_vs_Achilles")
+res
+
+#Explore results and increase adjusted p-value threshold
+summary(res) #Here you see that the adjusted p-value is <0.1. We can adjust that to 0.01;
+res0.01 <- results(dds, alpha = 0.01)
+summary(res0.01) #Check the difference between adjusted p-value 0.1 and 0.01 
+
+#Feed the results into new variables, separating the results of fib 0, fib 1 and fib 12. This will come 
+#in handy in a later stage
+resfib0 <- res
+resfib1 <- res
+resfib12 <- res
+
+#MA plot (for cluster 0, in this example)
+plotMA(res)|plotMA(res0.01) #Generates MA plots for p-values <0.1 and <0.01
+```
+
+#Volcano plot: DGE per cluster, per tendon type results
+```{r}
+EnhancedVolcano(res, lab = rownames(res), x = 'log2FoldChange', y = 'padj', title = 'Cluster 0: Hamstring vs Achilles', pCutoff = 0.05, FCcutoff = 0.5, pointSize = 3.0, labSize = 6.0, colAlpha = 1)
+
+EnhancedVolcano(res0.01, lab = rownames(res0.01), x = 'log2FoldChange', y = 'padj', title = 'Cluster 0: Hamstring vs Achilles padj < 0.01', pCutoff = 0.05, FCcutoff = 0.5, pointSize = 3.0, labSize = 6.0, colAlpha = 1)
+```
+
+#GSE analysis: per cluster, per tendon type results
+For the Wald test, stat is the Wald statistic: the log2FoldChange divided by lfcSE, which is compared to a standard Normal distribution to generate a two-tailed pvalue. For the likelihood ratio test (LRT), stat is the difference in deviance between the reduced model and the full model, which is compared to a chi-squared distribution to generate a pvalue.
+```{r}
+#Change DESeq2 results of the fibroblasts into dataframes
+resfib0.df <- as.data.frame(resfib0)
+resfib1.df <- as.data.frame(resfib1)
+resfib12.df <- as.data.frame(resfib12)
+
+#Order the dataframes (resfib0.df in this example)
+res.ordered <- resfib0.df[order(-resfib0.df$stat),]
+gene_list_GSEA <- res.ordered$stat
+
+#GSE analysis (ont can be changed to e.g., "BP"= biological processes)
+gse <- gseGO(gene_list_GSEA, 
+             ont ="ALL", 
+             keyType = "SYMBOL", 
+             OrgDb = "org.Hs.eg.db",
+             nPerm = 10000, 
+             minGSSize = 3, 
+             maxGSSize = 800, 
+             pvalueCutoff = 0.05, 
+             verbose = TRUE
+             )
+
+#Visualise GSE analysis results
+#Split 'sign' splits the gse plot in 'activated' (upregulated in hamstring compared to Achilles), 
+# and 'suppressed' (upregulated in Achilles compared to hamstring)
+dotplot(gse, showCategory = 15, split = ".sign", title = "Fib (TENO/FMOD+): hamstring vs Achilles") + facet_grid(.~.sign)
+```
+
+#Pseudobulk in fibroblast subset 
+```{r}
+#Visualise 
+cell_plot <- DimPlot(sub.fib, reduction = 'umap', group.by = 'seurat_clusters', label = TRUE)
+cond_plot <- DimPlot(sub.fib, reduction = 'umap', group.by = 'patient')
+
+cell_plot|cond_plot
+
+# pseudo-bulk workflow -----------------------------------------------------------------------------
+
+# 1. counts matrix - sample level
+
+#New column in metadata: patient and anatomical site combined
+View(sub.fib@meta.data)
+sub.fib$samples <- paste0(sub.fib$patient, sub.fib$anatomical_site)
+
+DefaultAssay(sub.fib)
+
+#Aggregation of counts to sample level
+cts.fib <- AggregateExpression(sub.fib, 
+                    group.by = c("cell_type", "cluster_tendontype"),
+                    assays = 'RNA',
+                    slot = "counts",
+                    return.seurat = FALSE)
+
+cts.fib <- cts.fib$RNA
+
+# transpose
+cts.fib.t <- t(cts.fib)
+
+# convert to data.frame
+cts.fib.t <- as.data.frame(cts.fib.t)
+
+# get values where to split
+splitRows.fib <- gsub('_.*', '', rownames(cts.fib.t))
+
+# split data.frame
+cts.fib.split <- split.data.frame(cts.fib.t,
+                 f = factor(splitRows.fib), 
+                 drop = TRUE)
+
+cts.fib.split$'0'[, 1:10] #Have a look at cell type/cluster 0 
+cts.fib.split$'1'[, 1:10] #Have a look at cell type/cluster 1 
+cts.fib.split$'12'[, 1:10] #Have a look at cell type/cluster 12
+
+# Manually use rownames_change on cell types
+rownames_change <- function(x){
+  rownames(x) <- gsub('.*_(.*)', '\\1', rownames(x))
+  return(x)
+}
+
+# Let's run DE analysis with cluster 0
+
+# 1. Get counts matrix
+counts_fib_total <- t(rownames_change(cts.fib.split$'Fib')) 
+counts_fib0 <- t(rownames_change(cts.fib.split$'0')) 
+counts_fib1 <- t(rownames_change(cts.fib.split$'1'))
+counts_fib12 <- t(rownames_change(cts.fib.split$'12'))
+counts_fib0 <- t(rownames_change(cts.fib.split$'Fib (TENO/FMOD+)')) 
+counts_fib1 <- t(rownames_change(cts.fib.split$'Fib (PDGFRA+)')) 
+counts_fib12 <- t(rownames_change(cts.fib.split$'Fib (SCN7A+)')) 
+
+# 2. generate sample level metadata (for cluster 0, in this example)
+colData <- data.frame(samples = colnames(counts_fib0))
+
+colData <- colData %>%
+  mutate(condition = ifelse(grepl('Achilles', samples), "Achilles", "Hamstring")) %>% 
+  column_to_rownames(var = 'samples')
+
+# 3. perform DESeq2 (on cluster 0, in this example)
+
+# Create DESeq2 object    
+dds.fib <- DESeqDataSetFromMatrix(countData = counts_fib0,
+                       colData = colData,
+                       design = ~ condition)
+
+# filter (keep the genes that have a minimum of 10 reads)
+keep <- rowSums(counts(dds.fib)) >=10
+dds.fib <- dds.fib[keep,]
+
+# run DESeq2
+dds.fib <- DESeq(dds.fib)
+
+# Check the coefficients for the comparison
+resultsNames(dds.fib)
+
+# Generate results object
+res.fib0 <- results(dds.fib, name = "condition_Hamstring_vs_Achilles")
+
+#End up with all 4 of these 
+#(res.fib.total is generated by using the )
+res.fib.total
+res.fib0
+res.fib1
+res.fib12
+
+#Explore results
+summary(res.fib0) #here you see that the adjusted p-value is <0.1. We can adjust that to 0.01;
+res.fib0.01 <- results(dds.fib, alpha = 0.01)
+summary(res.fib0.01) #--> different (lower) numbers of upregulated and downregulated genes
+
+#MA plot
+plotMA(res.fib) #--> blue genes are the SIGNIFICANTLY (adjusted p-value of 0.05) differentially expressed genes
+```
+
+#Volcano plot: comparing fibroblasts within fibroblast subsets, between hamstring and Achilles
+```{r}
+#res.fib.total in this example
+#padj = p adjusted value 
+EnhancedVolcano(res.fib.total, lab = rownames(res.fib.total), x = 'log2FoldChange', y = 'padj', title = 'All fibroblasts hamstring vs all fibroblasts Achilles', pCutoff = 0.05, FCcutoff = 0.5, pointSize = 3.0, labSize = 6.0, colAlpha = 1)
+```
+
+#Venn diagrams with matrisome filter (fibroblast subsets)
+```{r}
+#DE results (see chunk 'pseudobulk and DE analysis per cluster')
+resfib0
+resfib1
+resfib12
+
+#Gene list of interest (= complete matrisome)
+geneName <- matri.genes
+
+#Change argument in 'as.data.frame' according to fibroblast subset (resfib1/2/12)
+res.df <- as.data.frame(resfib12)
+df.reg <- res.df %>% mutate(diffexpressed = case_when(
+    log2FoldChange > 0 & padj <0.05 ~ 'UP', 
+    log2FoldChange < 0 & padj <0.05 ~ 'DOWN', 
+    padj > 0.05 ~ 'NO'
+    ))
+
+res.ordered <- df.reg[order(-df.reg$stat),]
+focus <- res.ordered[geneName,]
+focus$gene <- rownames(focus)
+focus <- as.data.frame(focus)
+focus <- focus %>%
+  filter(diffexpressed != "NO")
+focus <- focus[order(focus$stat),]
+
+#Save in one of these variables, according to which subset (0,1,12)
+focus0 <- focus #after subset 0
+focus1 <- focus #after subset 1
+focus12 <- focus #after subset 12
+
+#Generate 6 sets of subsets
+ach0 <- subset(focus0, diffexpressed == "DOWN")
+ach0 <-ach0$gene
+ham0 <- subset(focus0, diffexpressed == "UP")
+ham0 <- ham0$gene
+
+ach1 <- subset(focus1, diffexpressed == "DOWN")
+ach1 <- ach1$gene
+ham1 <- subset(focus1, diffexpressed == "UP")
+ham1 <- ham1$gene
+
+ach12 <- subset(focus12, diffexpressed == "DOWN")
+ach12 <- ach12$gene
+ham12 <- subset(focus12, diffexpressed == "UP")
+ham12 <- ham12$gene
+
+#Venn Hamstring (will be direclty saved onto computer)
+myCol <- c("#E69F00", "#56B4E9", "#009E73")
+
+venn1 <- venn.diagram(
+  x = list(ham0df$gene, ham1df$gene, ham12df$gene),
+  category.names = c("(TENO/FMOD+)", "(PDGFRA+)", "(SCN7A+)"), 
+  filename = "venn_ham_fibs.png",
+  print.mode = c("raw", "percent"),
+  imagetype = "png",
+  compression = "quartz",
+  output = T,
+  main= "Hamstring",
+  main.fontfamily = "sans",
+  main.fontface = "bold",
+  main.cex = 1.5,
+  lwd = 2, 
+  lty = 'blank',
+  fill = myCol,
+  cex = 1.5,
+  fontface = "plain",
+  fontfamily = "sans", 
+  cat.cex = 1.2,
+  cat.default.pos = "outer",
+  cat.pos = c(-27, 27, 135),
+  cat.dist = c(0.055, 0.055, 0.085),
+  cat.fontfamily = "sans",
+  cat.col = myCol,
+  rotation = 1)
+
+#Venn Achilles (will be direclty saved onto computer)
+myCol <- c("#E69F00", "#56B4E9", "#009E73")
+
+venn2 <- venn.diagram(
+  x = list(ach0df$gene, ach1df$gene, ach12df$gene),
+  category.names = c("(TENO/FMOD+)", "(PDGFRA+)", "(SCN7A+)"), 
+  filename = "venn_ach_fibs.png",
+  print.mode = c("raw", "percent"),
+  imagetype = "png",
+  compression = "quartz",
+  output = T,
+  main= "Achilles",
+  main.fontfamily = "sans",
+  main.fontface = "bold",
+  main.cex = 1.5,
+  lwd = 2, 
+  lty = 'blank',
+  fill = myCol,
+  cex = 1.5,
+  fontface = "plain",
+  fontfamily = "sans", 
+  cat.cex = 1.2,
+  cat.default.pos = "outer",
+  cat.pos = c(-27, 27, 135),
+  cat.dist = c(0.055, 0.055, 0.085),
+  cat.fontfamily = "sans",
+  cat.col = myCol,
+  rotation = 1)
+```
+
+#GSE analysis: comparing fibroblast to one another within the fibroblast population
+For the Wald test, stat is the Wald statistic: the log2FoldChange divided by lfcSE, which is compared to a standard Normal distribution to generate a two-tailed pvalue. For the likelihood ratio test (LRT), stat is the difference in deviance between the reduced model and the full model, which is compared to a chi-squared distribution to generate a pvalue.
+```{r, height = 20, width = 5}
+#Res.fib0 as an example here
+res.df <- as.data.frame(res.fib0)
+res.ordered <- res.df[order(-res.df$stat),]
+gene_list_GSEA <- res.ordered$stat
+
+#GSE analysis
+gse <- gseGO(gene_list_GSEA, 
+             ont ="ALL", 
+             keyType = "SYMBOL", 
+             OrgDb = "org.Hs.eg.db",
+             nPerm = 10000, 
+             minGSSize = 3, 
+             maxGSSize = 800, 
+             pvalueCutoff = 0.05, 
+             verbose = TRUE
+             )
+
+#Visualise
+dotplot(gse, showCategory = 15, split = ".sign", title = "Fib (TENO/FMOD+) in both tendon types vs other fib clusters in both tendon types") + facet_grid(.~.sign)
+
+#subset ECM pathways
+ECM_pathways <- c("GO:0030198", "GO:0048251", "GO:0071711", "GO:0022617", "GO:0085029", "GO:0030199", "GO:0070278")
+
+gse.mat <- as.matrix(gse) 
+
+GOsub1 <- gse[(gse$ID == "GO:0030198")]
+GOsub2 <- gse[(gse$ID == "GO:0048251")]
+GOsub3 <- gse[(gse$ID == "GO:0071711")]
+GOsub4 <- gse[(gse$ID == "GO:0022617")]
+GOsub5 <- gse[(gse$ID == "GO:0085029")]
+GOsub6 <- gse[(gse$ID == "GO:0030199")]
+GOsub7 <- gse[(gse$ID == "GO:0070278")]
+GOsub8 <- gse[(gse$ID == "GO:0007179")]
+GOsub <- rbind(GOsub1, GOsub2, GOsub3, GOsub4,GOsub5, GOsub6, GOsub7, GOsub8)
+view(GOsub)
+```
+
+#Volcano plots: summary of matrisome genes filter DGE results
+One volcano plot to show the core matrisome (collagens, proteoglycans, glycoproteins) 
+and associated matrisome, using different colours and shapes.
+
+Firstly, data needs to be ready. Put a new column with symbol (gene) names (basically 
+copying the rownames). Then call the variable 'x', in order to make the next steps easier. 
+```{r}
+#which fib?
+resfib0$symbol <- mapIds(org.Hs.eg.db, keys = rownames(resfib0), keytype = "SYMBOL", column = "SYMBOL")
+resfib1$symbol <- mapIds(org.Hs.eg.db, keys = rownames(resfib1), keytype = "SYMBOL", column = "SYMBOL")
+resfib12$symbol <- mapIds(org.Hs.eg.db, keys = rownames(resfib12), keytype = "SYMBOL", column = "SYMBOL")
+
+x <- resfib0
+x <- resfib1
+x <- resfib12
+
+x$matrisome <- x$symbol
+x$matrisome[intersect(x$matrisome, collagens)] <- 'Collagens' 
+x$matrisome[intersect(x$matrisome, proteoglycans)] <- 'Proteoglycans' 
+x$matrisome[intersect(x$matrisome, glycoproteinsECM)] <- 'Glycoproteins' 
+x$matrisome[intersect(x$matrisome, assoc.matri)] <- 'Associated matrisome' 
+
+# create custom key-value pairs for different cell-types
+# this can be achieved with nested ifelse statements
+  keyvals.colour <- ifelse(
+    rownames(x) %in% collagens, "#E6B0AA",
+      ifelse(rownames(x) %in% proteoglycans, "skyblue",
+             ifelse(rownames(x) %in% glycoproteinsECM, "#17A589",
+                    ifelse(rownames(x) %in% assoc.matri, "#CCCCFF",
+        "azure2"))))
+  
+  keyvals[is.na(keyvals)] <- 'azure2'
+  names(keyvals)[keyvals == 'azure2'] <- 'Non-matrisome'
+  names(keyvals)[keyvals == '#E6B0AA'] <- 'Collagens'
+  names(keyvals)[keyvals == 'skyblue'] <- 'Proteoglycans'
+  names(keyvals)[keyvals == '#17A589'] <- 'Glycoproteins'
+  names(keyvals)[keyvals == '#CCCCFF'] <- 'Associated matrisome'
+  
+ keyvals.shape[is.na(keyvals.shape)] <- 8
+names(keyvals.shape)[keyvals.shape == 8] <- 'Non-matrisome'
+  names(keyvals.shape)[keyvals.shape == 17] <- 'Collagens'
+  names(keyvals.shape)[keyvals.shape == 17] <- 'Proteoglycans'
+  names(keyvals.shape)[keyvals.shape == 17] <- 'Glycoproteins'
+  names(keyvals.shape)[keyvals.shape == 17] <- 'Associated matrisome'
+  
+  keyvals.colour[is.na(keyvals.colour)] <- 'azure2'
+ names(keyvals.colour)[keyvals.colour == 'azure2'] <- 'Non-matrisome'
+  names(keyvals.colour)[keyvals.colour == '#E6B0AA'] <- 'Collagens'
+  names(keyvals.colour)[keyvals.colour == 'skyblue'] <- 'Proteoglycans'
+  names(keyvals.colour)[keyvals.colour == '#17A589'] <- 'Glycoproteins'
+  names(keyvals.colour)[keyvals.colour == '#CCCCFF'] <- 'Associated matrisome'
+
+  
+  EnhancedVolcano(x,
+    lab = rownames(x),
+    x = 'log2FoldChange',
+    y = 'padj',
+    selectLab = rownames(x)[which(names(keyvals.colour) %in% c('Collagens', 'Proteoglycans', 'Glycoproteins', 'Associated matrisome'))],
+    xlab = bquote(~Log[2]~ 'fold change'),
+    title = 'Matrisome specific genes in fib (TENO/FMOD+)', #CHANGE TITLE HERE
+    pCutoff = 0.05,
+    FCcutoff = 0.5,
+    pointSize = 4.5,
+    labSize = 4.5,
+    colCustom = keyvals.colour,
+    #shape = c(17, 17, 17, 8, 17),
+    colAlpha = 1,
+    legendLabSize = 15,
+    max.overlaps = 50,
+    legendPosition = 'right',
+    legendIconSize = 5.0,
+    drawConnectors = F,
+    widthConnectors = 0.5,
+    colConnectors = 'grey50',
+    gridlines.major = TRUE,
+    gridlines.minor = FALSE,
+    border = 'partial',
+    borderWidth = 1.5,
+    borderColour = 'black')
+```
+
